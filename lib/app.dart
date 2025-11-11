@@ -31,6 +31,6 @@ class Root extends StatelessWidget {
     if (auth.isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return auth.user == null ? const LoginScreen() : const HomeScreen();
+    return auth.user == null ?  LoginScreen() : const HomeScreen();
   }
 }
