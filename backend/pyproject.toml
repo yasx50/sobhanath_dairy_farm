@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.127.1",
     "google-auth>=2.45.0",
     "passlib[bcrypt]>=1.7.4",
+    
     "pymongo>=4.15.5",
     "python-dotenv>=1.2.1",
     "python-jose>=3.5.0",
