@@ -1,3 +1,5 @@
+import 'profile_screen.dart';
+import 'gaushala_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
@@ -5,7 +7,7 @@ import 'dart:convert';
 
 class CalendarScreen extends StatefulWidget {
   final String customerName;
-  final String phoneNumber; // Add phone number
+  final String phoneNumber;
   const CalendarScreen({
     super.key,
     required this.customerName,
@@ -32,11 +34,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     try {
       final now = DateTime.now();
       final response = await http.get(
-        Uri.parse('http://192.168.0.100:5000/milk-entry//${widget.phoneNumber}/milk-records/${now.year}/${now.month}'),
+        Uri.parse('http://192.168.0.100:5000/milk-entry/${widget.phoneNumber}/milk-records/${now.year}/${now.month}'),
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        // Parse and populate milkEntries from backend
         setState(() {
           totalBill = data['currentMonthAmount'] ?? 0;
         });
@@ -198,6 +199,30 @@ class _CalendarScreenState extends State<CalendarScreen> {
     setState(() => totalBill = bill);
   }
 
+  void _logout() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -231,21 +256,39 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.person),
+              leading: const Icon(Icons.person, color: Colors.green),
               title: const Text("Profile"),
-              onTap: () {},
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ProfileScreen(phoneNumber: widget.phoneNumber),
+                  ),
+                );
+              },
             ),
             ListTile(
-              leading: const Icon(Icons.shopping_bag),
-              title: const Text("Orders"),
-              onTap: () {},
+              leading: const Icon(Icons.pets, color: Colors.green),
+              title: const Text("Gaushala"),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const GaushalaScreen(),
+                  ),
+                );
+              },
             ),
             const Spacer(),
+            const Divider(),
             ListTile(
-              leading: const Icon(Icons.logout),
+              leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text("Logout"),
-              onTap: () {},
+              onTap: _logout,
             ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

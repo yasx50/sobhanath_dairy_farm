@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "769666598578",
+    "firebase_url": "https://sobhanath-dairy-farm-default-rtdb.firebaseio.com",
     "project_id": "sobhanath-dairy-farm",
     "storage_bucket": "sobhanath-dairy-farm.firebasestorage.app"
   },
@@ -12,7 +13,12 @@
           "package_name": "com.example.sobhanath_dairy_farm"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "769666598578-qq5kj62h6dflhkmj3rssuvq7k6q891gh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBhbrGhBRy7cT-dlQdrWezDgHqx25eZBE0"
@@ -20,7 +26,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "769666598578-qq5kj62h6dflhkmj3rssuvq7k6q891gh.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "769666598578-gds5e8ee2l6lcc4jpbp04jm6laq7snse.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.sobhanathDairyFarm"
+              }
+            }
+          ]
         }
       }
     }

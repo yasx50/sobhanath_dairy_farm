@@ -15,6 +15,10 @@ app.use("/sign-up", sign_up)
 import sign_in from "./routes/sign_in.js"
 app.use("/login", sign_in)
 
+// customer
+import customer_route from "./routes/coustomer_route.js"
+app.use("/customer", customer_route)
+
 
 
 app.get("/", (req, res) => {
