@@ -1,95 +1,311 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_upi_india/flutter_upi_india.dart';
 
-class GaushalaScreen extends StatelessWidget {
+class GaushalaScreen extends StatefulWidget {
   const GaushalaScreen({super.key});
 
+  @override
+  State<GaushalaScreen> createState() => _GaushalaScreenState();
+}
+
+class _GaushalaScreenState extends State<GaushalaScreen> {
+  List<ApplicationMeta>? _apps;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _getApps();
+  }
+
+  Future<void> _getApps() async {
+    try {
+      // Try to get all UPI apps
+      final apps = await UpiPay.getInstalledUpiApplications(
+        statusType: UpiApplicationDiscoveryAppStatusType.all,
+      );
+      
+      setState(() {
+        _apps = apps;
+        if (apps.isEmpty) {
+          _errorMessage = "No UPI apps detected. Please check AndroidManifest.xml";
+        }
+      });
+
+      // Debug: Print app count
+      print("Found ${apps.length} UPI apps");
+      for (var app in apps) {
+        print("App: ${app.upiApplication.getAppName()}");
+      }
+      
+    } catch (e) {
+      setState(() {
+        _errorMessage = "Error: $e";
+      });
+      print("Error fetching UPI apps: $e");
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error fetching UPI apps: $e")),
+        );
+      }
+    }
+  }
+
+  Future<void> _pay(String amount, ApplicationMeta app) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final transactionRef = Random.secure().nextInt(1 << 32).toString();
+
+      final response = await UpiPay.initiateTransaction(
+        amount: amount,
+        app: app.upiApplication,
+        receiverName: 'Sobhnath Gaushala',
+        receiverUpiAddress: 'huyashbhai-1@okicici', // 🔴 CHANGE THIS
+        transactionRef: transactionRef,
+        transactionNote: 'Gaushala Donation',
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Transaction completed! Check your payment app for status."),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Transaction Error: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showUpiApps(String amount) {
+    // Better check with debug info
+    if (_apps == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Still loading UPI apps. Please wait..."),
+          backgroundColor: Colors.blue,
+        ),
+      );
+      return;
+    }
+
+    if (_apps!.isEmpty) {
+      // Show detailed error dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("No UPI Apps Found"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Unable to detect UPI apps on your device."),
+              const SizedBox(height: 12),
+              const Text("Solutions:", style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text("1. Make sure you have Google Pay or PhonePe installed"),
+              const SizedBox(height: 4),
+              const Text("2. Restart the app after installing UPI apps"),
+              const SizedBox(height: 4),
+              const Text("3. Check if AndroidManifest.xml has <queries> tag"),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Text("Error: $_errorMessage", style: const TextStyle(color: Colors.red)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _getApps(); // Retry
+              },
+              child: const Text("Retry"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                "Choose Payment App (${_apps!.length} found)",
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            Flexible(
+              child: GridView.count(
+                crossAxisCount: 3,
+                shrinkWrap: true,
+                padding: const EdgeInsets.all(16),
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 0.85,
+                children: _apps!.map((app) {
+                  return InkWell(
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _pay(amount, app);
+                    },
+                    child: Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          app.iconImage(48),
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Text(
+                              app.upiApplication.getAppName(),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        );
+      },
+    );
+  }
+
   void _showDonationDialog(BuildContext context) {
-    final amountController = TextEditingController();
-    String selectedAmount = '500';
+    final amountController = TextEditingController(text: "500");
+    String selectedAmount = "500";
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Row(
             children: [
               Icon(Icons.favorite, color: Colors.red),
               SizedBox(width: 8),
-              Text('Donate to Gaushala'),
+              Text("Donate to Gaushala"),
             ],
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Your donation helps us take care of our beloved cows',
-                  style: TextStyle(fontSize: 14),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Select or enter donation amount:",
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: ["100", "500", "1000", "2000"].map((amount) {
+                  return ChoiceChip(
+                    label: Text("₹$amount"),
+                    selected: selectedAmount == amount,
+                    selectedColor: Colors.green.shade100,
+                    onSelected: (_) {
+                      setDialogState(() {
+                        selectedAmount = amount;
+                        amountController.text = amount;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "Custom Amount (₹)",
+                  border: OutlineInputBorder(),
+                  prefixText: "₹ ",
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Quick Amount',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: ['100', '500', '1000', '2000'].map((amount) {
-                    return ChoiceChip(
-                      label: Text('₹$amount'),
-                      selected: selectedAmount == amount,
-                      onSelected: (selected) {
-                        setDialogState(() {
-                          selectedAmount = amount;
-                          amountController.text = amount;
-                        });
-                      },
-                      selectedColor: Colors.green,
-                      labelStyle: TextStyle(
-                        color: selectedAmount == amount ? Colors.white : Colors.black,
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: amountController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Custom Amount',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.currency_rupee),
-                    hintText: 'Enter amount',
-                  ),
-                  onChanged: (value) {
-                    setDialogState(() => selectedAmount = value);
-                  },
-                ),
-              ],
-            ),
+                onChanged: (v) {
+                  setDialogState(() {
+                    selectedAmount = v;
+                  });
+                },
+              ),
+            ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: const Text("Cancel"),
             ),
             ElevatedButton(
               onPressed: () {
                 final amount = int.tryParse(selectedAmount) ?? 0;
                 if (amount > 0) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Thank you for your donation of ₹$amount!'),
-                      backgroundColor: Colors.green,
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
+                  _showUpiApps(selectedAmount);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Please enter a valid amount'),
+                      content: Text("Please enter a valid amount"),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -99,7 +315,7 @@ class GaushalaScreen extends StatelessWidget {
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Donate Now'),
+              child: const Text("Pay via UPI"),
             ),
           ],
         ),
@@ -131,54 +347,18 @@ class GaushalaScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               name,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    breed,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Age: $age',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
+            Text(
+              "$breed • Age: $age",
+              style: TextStyle(color: Colors.grey.shade600),
             ),
             const SizedBox(height: 12),
             Text(
               description,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade700,
-              ),
+              style: const TextStyle(fontSize: 14),
             ),
           ],
         ),
@@ -190,175 +370,109 @@ class GaushalaScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gaushala'),
+        title: const Text("Gaushala", style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
+        elevation: 0,
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Header Section
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.green.shade400, Colors.green.shade700],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Column(
-              children: [
-                const Icon(
-                  Icons.pets,
-                  size: 64,
-                  color: Colors.white,
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Sobhnath Gaushala',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+          Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green, Colors.green.shade700],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Protecting and Caring for Sacred Cows',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white.withOpacity(0.9),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-
-          // Info Banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: Colors.orange.shade50,
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.orange.shade700),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'We currently care for 25+ cows in our gaushala. Your support helps us provide food, shelter, and medical care.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.orange.shade900,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Cows List
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              children: [
-                _buildCowCard(
-                  name: 'Ganga',
-                  breed: 'Gir',
-                  age: '5 years',
-                  description: 'A gentle soul who loves to graze in the morning sun. Ganga is one of our oldest residents and produces high-quality milk.',
-                  icon: Icons.pets,
-                  color: Colors.brown,
-                ),
-                _buildCowCard(
-                  name: 'Lakshmi',
-                  breed: 'Sahiwal',
-                  age: '3 years',
-                  description: 'Young and energetic, Lakshmi is very friendly and loves to interact with visitors. She has a beautiful light brown coat.',
-                  icon: Icons.favorite,
-                  color: Colors.pink,
-                ),
-                _buildCowCard(
-                  name: 'Kamadhenu',
-                  breed: 'Red Sindhi',
-                  age: '7 years',
-                  description: 'Our most senior and wise cow. Kamadhenu is calm and peaceful, often found resting under the shade.',
-                  icon: Icons.spa,
-                  color: Colors.green,
-                ),
-                _buildCowCard(
-                  name: 'Nandini',
-                  breed: 'Jersey Cross',
-                  age: '2 years',
-                  description: 'The youngest member of our gaushala family. Nandini is playful and brings joy to everyone around.',
-                  icon: Icons.child_care,
-                  color: Colors.blue,
-                ),
-                _buildCowCard(
-                  name: 'Surabhi',
-                  breed: 'Tharparkar',
-                  age: '4 years',
-                  description: 'A healthy and strong cow with a calm temperament. Surabhi is known for her excellent milk quality.',
-                  icon: Icons.star,
-                  color: Colors.amber,
-                ),
-              ],
-            ),
-          ),
-
-          // Donation Button
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.shade300,
-                  blurRadius: 4,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  'Support Our Gaushala',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Every contribution helps provide better care for our cows',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showDonationDialog(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.all(16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                child: const Column(
+                  children: [
+                    Icon(Icons.pets, size: 60, color: Colors.white),
+                    SizedBox(height: 8),
+                    Text(
+                      "Sobhnath Gaushala",
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
-                    icon: const Icon(Icons.volunteer_activism, size: 24),
-                    label: const Text(
-                      'Donate Now',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    SizedBox(height: 4),
+                    Text(
+                      "Support our sacred cows",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 80),
+                  children: [
+                    _buildCowCard(
+                      name: "Ganga",
+                      breed: "Gir",
+                      age: "5 years",
+                      description: "Gentle and loving cow. Known for high-quality milk.",
+                      icon: Icons.pets,
+                      color: Colors.brown,
+                    ),
+                    _buildCowCard(
+                      name: "Lakshmi",
+                      breed: "Sahiwal",
+                      age: "3 years",
+                      description: "Friendly and energetic. Loves to interact with visitors.",
+                      icon: Icons.favorite,
+                      color: Colors.pink,
+                    ),
+                    _buildCowCard(
+                      name: "Kamadhenu",
+                      breed: "Red Sindhi",
+                      age: "7 years",
+                      description: "Wise and peaceful. The oldest member of our family.",
+                      icon: Icons.spa,
+                      color: Colors.orange,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            bottom: 16,
+            left: 16,
+            right: 16,
+            child: ElevatedButton.icon(
+              onPressed: _isLoading ? null : () => _showDonationDialog(context),
+              icon: _isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.volunteer_activism),
+              label: Text(
+                _isLoading ? "Processing..." : "Donate Now",
+                style: const TextStyle(fontSize: 16),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.all(16),
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
           ),
         ],
