@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'calendar_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -44,9 +45,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => isLoading = true);
 
     try {
+      final backendUrl = dotenv.env['BACKEND_URL'] ?? 'http://localhost:5000';
       final endpoint = isSignUp 
-          ? 'http://192.168.0.100:5000/sign-up/' 
-          : 'http://192.168.0.100:5000/login/';
+          ? '$backendUrl/sign-up/' 
+          : '$backendUrl/login/';
       
       final response = await http.post(
         Uri.parse(endpoint),

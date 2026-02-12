@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String phoneNumber;
@@ -30,8 +31,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
+      final backendUrl = dotenv.env['BACKEND_URL'] ?? 'http://localhost:5000';
       final response = await http.get(
-        Uri.parse('http://192.168.0.100:5000/customer/${widget.phoneNumber}'),
+        Uri.parse('$backendUrl/customer/${widget.phoneNumber}'),
       );
 
       if (response.statusCode == 200) {

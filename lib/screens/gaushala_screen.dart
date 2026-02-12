@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_upi_india/flutter_upi_india.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GaushalaScreen extends StatefulWidget {
   const GaushalaScreen({super.key});
@@ -13,11 +15,58 @@ class _GaushalaScreenState extends State<GaushalaScreen> {
   List<ApplicationMeta>? _apps;
   bool _isLoading = false;
   String? _errorMessage;
+  late Razorpay _razorpay;
 
   @override
   void initState() {
     super.initState();
     _getApps();
+    _initializeRazorpay();
+  }
+
+  void _initializeRazorpay() {
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Payment Successful!\nPayment ID: ${response.paymentId}"),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+    print("Payment Success: ${response.paymentId}");
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Payment Failed!\nError: ${response.message}"),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+    print("Payment Error: ${response.message}");
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("External Wallet Selected: ${response.walletName}"),
+          backgroundColor: Colors.blue,
+        ),
+      );
+    }
+    print("External Wallet: ${response.walletName}");
   }
 
   Future<void> _getApps() async {
@@ -51,6 +100,44 @@ class _GaushalaScreenState extends State<GaushalaScreen> {
           SnackBar(content: Text("Error fetching UPI apps: $e")),
         );
       }
+    }
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
+
+  Future<void> _payWithRazorpay(String amount) async {
+    try {
+      var options = {
+        'key': dotenv.env['RAZORPAY_KEY_ID'] ?? 'rzp_test_ofe2WQK1ymU8N1',
+        'amount': (int.parse(amount) * 100).toString(), // Amount in paise
+        'name': 'Sobhnath Gaushala',
+        'description': 'Donation to Gaushala',
+        'prefill': {
+          'contact': '9000090000', // 🔴 OPTIONAL: Pre-filled phone number
+          'email': 'donor@gaushala.com', // 🔴 OPTIONAL: Pre-filled email
+        },
+        'notes': {
+          'purpose': 'Gaushala Donation',
+          'timestamp': DateTime.now().toString(),
+        },
+        'timeout': 300, // 5 minutes timeout
+      };
+
+      _razorpay.open(options);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error initiating payment: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      print("Razorpay Error: $e");
     }
   }
 
@@ -234,6 +321,7 @@ class _GaushalaScreenState extends State<GaushalaScreen> {
   void _showDonationDialog(BuildContext context) {
     final amountController = TextEditingController(text: "500");
     String selectedAmount = "500";
+    String selectedPaymentMethod = "razorpay"; // Default to Razorpay
 
     showDialog(
       context: context,
@@ -249,47 +337,94 @@ class _GaushalaScreenState extends State<GaushalaScreen> {
               Text("Donate to Gaushala"),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Select or enter donation amount:",
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: ["100", "500", "1000", "2000"].map((amount) {
-                  return ChoiceChip(
-                    label: Text("₹$amount"),
-                    selected: selectedAmount == amount,
-                    selectedColor: Colors.green.shade100,
-                    onSelected: (_) {
-                      setDialogState(() {
-                        selectedAmount = amount;
-                        amountController.text = amount;
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Custom Amount (₹)",
-                  border: OutlineInputBorder(),
-                  prefixText: "₹ ",
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Select or enter donation amount:",
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
-                onChanged: (v) {
-                  setDialogState(() {
-                    selectedAmount = v;
-                  });
-                },
-              ),
-            ],
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: ["100", "500", "1000", "2000"].map((amount) {
+                    return ChoiceChip(
+                      label: Text("₹$amount"),
+                      selected: selectedAmount == amount,
+                      selectedColor: Colors.green.shade100,
+                      onSelected: (_) {
+                        setDialogState(() {
+                          selectedAmount = amount;
+                          amountController.text = amount;
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: "Custom Amount (₹)",
+                    border: OutlineInputBorder(),
+                    prefixText: "₹ ",
+                  ),
+                  onChanged: (v) {
+                    setDialogState(() {
+                      selectedAmount = v;
+                    });
+                  },
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "Choose Payment Method:",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                RadioListTile<String>(
+                  title: const Row(
+                    children: [
+                      Icon(Icons.payment, color: Colors.blue, size: 24),
+                      SizedBox(width: 12),
+                      Text("Razorpay"),
+                    ],
+                  ),
+                  subtitle: const Text("Credit/Debit Card, UPI, Wallets"),
+                  value: "razorpay",
+                  groupValue: selectedPaymentMethod,
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedPaymentMethod = value!;
+                    });
+                  },
+                ),
+                RadioListTile<String>(
+                  title: const Row(
+                    children: [
+                      Icon(Icons.mobile_screen_share, color: Colors.purple, size: 24),
+                      SizedBox(width: 12),
+                      Text("UPI"),
+                    ],
+                  ),
+                  subtitle: const Text("Google Pay, PhonePe, etc."),
+                  value: "upi",
+                  groupValue: selectedPaymentMethod,
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedPaymentMethod = value!;
+                    });
+                  },
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -301,7 +436,11 @@ class _GaushalaScreenState extends State<GaushalaScreen> {
                 final amount = int.tryParse(selectedAmount) ?? 0;
                 if (amount > 0) {
                   Navigator.pop(context);
-                  _showUpiApps(selectedAmount);
+                  if (selectedPaymentMethod == "razorpay") {
+                    _payWithRazorpay(selectedAmount);
+                  } else {
+                    _showUpiApps(selectedAmount);
+                  }
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -315,7 +454,7 @@ class _GaushalaScreenState extends State<GaushalaScreen> {
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
               ),
-              child: const Text("Pay via UPI"),
+              child: const Text("Proceed to Pay"),
             ),
           ],
         ),
