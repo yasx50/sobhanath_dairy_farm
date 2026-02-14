@@ -1,5 +1,16 @@
+<<<<<<< HEAD
 plugins {
     id("com.google.gms.google-services") version "4.3.15" apply false
+=======
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.google.gms:google-services:4.4.0")
+    }
+>>>>>>> 90e314c0eba4e980296523a123ab56091c512c34
 }
 
 allprojects {
@@ -9,6 +20,7 @@ allprojects {
     }
 }
 
+<<<<<<< HEAD
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
         .dir("../../build")
@@ -23,3 +35,9 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 }
+=======
+tasks.register<Delete>("clean") {
+    delete(rootProject.buildDir)
+}
+apply(plugin = "com.google.gms.google-services")
+>>>>>>> 90e314c0eba4e980296523a123ab56091c512c34
