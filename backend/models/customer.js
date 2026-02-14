@@ -131,6 +131,7 @@ const customerSchema = new mongoose.Schema(
         type: Number,
         default: new Date().getFullYear()
       },
+      
       years: [yearlyMilkSummarySchema],
       currentMonthTotal: {
         type: Number,
